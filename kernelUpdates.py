@@ -1,16 +1,123 @@
 import subprocess
 import os
 import sys
+import tty
+import termios
 
 RED = '\033[91m'   
 RESET = '\033[0m'
+BLUE = '\033[94m'
+
+def get_key():
+    """Get a single keypress from the terminal"""
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        key = sys.stdin.read(1)
+        # Handle arrow keys (they send 3 characters: \x1b[A, \x1b[B, etc.)
+        if key == '\x1b':
+            key += sys.stdin.read(2)
+        return key
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+def show_package_manager_menu(options):
+    """
+    Display an interactive menu with arrow key navigation for package manager selection
+    
+    Args:
+        options: List of tuples (display_text, return_value)
+    
+    Returns:
+        The return_value of the selected option
+    """
+    selected = 0
+    
+    while True:
+        # Clear screen and move cursor to top
+        print("\033[2J\033[H", end="")
+        
+        print(f"{RED}Unable to detect your distribution!{RESET}")
+        print("\nPlease select your package manager:")
+        print("Use ↑/↓ arrow keys to navigate, Enter to select:\n")
+        
+        # Print menu options
+        for i, (text, _) in enumerate(options):
+            if i == selected:
+                print(f"  > {text}")
+            else:
+                print(f"    {text}")
+        
+        # Get user input
+        key = get_key()
+        
+        # Handle arrow keys
+        if key == '\x1b[A':  # Up arrow
+            selected = (selected - 1) % len(options)
+        elif key == '\x1b[B':  # Down arrow
+            selected = (selected + 1) % len(options)
+        elif key == '\r' or key == '\n':  # Enter
+            return options[selected][1]
+        elif key == '\x03':  # Ctrl+C
+            print("\n\nExiting...")
+            sys.exit(0)
+
+def failed2find():
+    # Distro not recognized, show package manager selection menu
+        package_manager_commands = {
+            "apt": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
+            "pacman": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf swtpm qemu-full -y",
+            "dnf": "dnf5 install @virtualization",
+            "zypper": "zypper in libvirt libvirt-client libvirt-daemon virt-manager virt-install virt-viewer qemu qemu-kvm qemu-ovmf-x86_64 qemu-tools -y",
+            "yum": "yum install @virtualization",
+        }
+        
+        menu_options = [
+            ("APT (Debian, Ubuntu, Pop!_OS, Mint)", "apt"),
+            ("Pacman (Arch, Manjaro, EndeavourOS)", "pacman"),
+            ("DNF (Fedora)", "dnf"),
+            ("Zypper (openSUSE)", "zypper"),
+            ("YUM (RHEL, CentOS)", "yum"),
+            ("Not listed - I'll install manually", "manual")
+        ]
+        
+        selected_pm = show_package_manager_menu(menu_options)
+        
+        if selected_pm == "manual":
+            print("\n" + "="*60)
+            print(f"{BLUE}Manual Installation Required{RESET}")
+            print("="*60)
+            print("\nPlease install the following dependencies manually:")
+            print("  - qemu-kvm / qemu")
+            print("  - libvirt (libvirt-clients, libvirt-daemon-system)")
+            print("  - virt-manager")
+            print("  - bridge-utils")
+            print("  - ovmf")
+            print("  - dnsmasq")
+            print("  - ebtables / iptables")
+            print("\nAfter installing these packages, please rerun this script")
+            print("and select 'Resume Previous Setup' from the main menu.")
+            print("\nPress Enter to exit...")
+            input()
+            sys.exit(0)
+        else:
+            print(f"\nInstalling packages using {selected_pm.upper()}...")
+            try:
+                subprocess.run(package_manager_commands[selected_pm], shell=True, check=True)
+                print(f"Installation using {selected_pm.upper()} completed.")
+            except subprocess.CalledProcessError as e:
+                print(f"🚨 Error 🚨 during installation: {RED}{e}{RESET}")
+                print("\nIf the installation failed, you may need to install manually.")
+                print("Press Enter to continue...")
+                input()
 
 def installations(distro):
     commands = {
         "pop": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
         "manjaro": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf -y",
         "debian": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
-        "opensuse" "zypper in libvirt libvirt-client libvirt-daemon virt-manager virt-install virt-viewer qemu qemu-kvm qemu-ovmf-x86_64 qemu-tools -y"
+        "opensuse": "zypper in libvirt libvirt-client libvirt-daemon virt-manager virt-install virt-viewer qemu qemu-kvm qemu-ovmf-x86_64 qemu-tools -y",
         "linuxmint": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
         "arch": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf swtpm qemu-full -y",
         "ubuntu": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
@@ -26,7 +133,7 @@ def installations(distro):
         except subprocess.CalledProcessError as e:
             print(f"🚨 Error 🚨 during installation: {RED}{e}{RESET}")
     else:
-        print(f"No installation command found for {distro.capitalize()}.")
+        failed2find()
 
 def checkCPU():
     #Checking if AMD or Intel
@@ -176,8 +283,8 @@ def kernelBootChanges(distro):
         initramfsKernelBootChanges()
     elif distro == "fedora":
         print("Fedora detected!")
-        grubChanges()
-        dracutKernelBootChanges()
+        # grubChanges() # This seems to target /etc/sysconfig/grub which is for legacy systems
+        # dracutKernelBootChanges() # This is correct for modern Fedora
     elif distro == "debian":
         print("Debian detected!")
         grubChanges()
@@ -201,12 +308,8 @@ def kernelBootChanges(distro):
         print("🚨 Distro not supported 🚨")
         sys.exit(1)
 
-    print("================================================================================")
-    print("REMINDER: After you have rebooted, open virt-manager, and then rerun this script as part 2")
-    print("================================================================================")
-    reboot_choice = input("Do you want to reboot now (Y/n)? ").strip().lower()
-    if reboot_choice in ("yes", "y", ""):
-        print("Rebooting system...")
-        subprocess.run(["reboot"])
-    else:
-        print("System will not reboot now.")
+def reboot_system():
+    """Reboots the system."""
+    print("Rebooting system now...")
+    # Use a command that doesn't wait for the script to exit
+    subprocess.Popen(["reboot"])

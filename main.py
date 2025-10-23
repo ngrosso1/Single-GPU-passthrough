@@ -1,14 +1,23 @@
-from kernelUpdates import installations, kernelBootChanges
-from vmCreation import get_vm_config, create_vm, modify_storage_bus, update_display_to_vnc, cleanupDrives
-from getISO import get_windows_iso
-from hooks import setup_libvirt_hooks, update_start_sh, update_revert_sh, add_gpu_passthrough_devices
+import threading
 import sys
 import json
 import os
+import io
+import time
+import tty
+import termios
+
+from kernelUpdates import installations, failed2find, kernelBootChanges, reboot_system
+from vmCreation import get_sys_info, create_vm, modify_storage_bus, update_display_to_vnc, cleanupDrives
+from getISO import ensure_libvirt_access, virtioDrivers
+from hooks import setup_libvirt_hooks, update_start_sh, update_revert_sh, add_gpu_passthrough_devices
 
 PROGRESS_FILE = "progress.json"
 
-def saveProgress(choice, step):
+def saveProgress(choice, step, data=None):
+    progress = {"choice": choice, "step": step}
+    if data:
+        progress["data"] = data
     with open(PROGRESS_FILE, "w") as f:
         json.dump({"choice": choice, "step": step}, f)
 
@@ -28,97 +37,197 @@ def get_distro():
         for line in f:
             if line.lower().startswith("id="):
                 return line.strip().split("=")[1].strip('"').lower()
+    return None
 
-def choice_1(distro):
-    progress = loadProgress()
-    start_from = progress["step"] if progress and progress["choice"] == "1" else None
+def get_key():
+    """Get a single keypress from the terminal"""
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        key = sys.stdin.read(1)
+        # Handle arrow keys (they send 3 characters: \x1b[A, \x1b[B, etc.)
+        if key == '\x1b':
+            key += sys.stdin.read(2)
+        return key
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
-    if start_from is None or start_from == "installations":
-        installations(distro)
-        saveProgress("1", "installations")
-    if start_from is None or start_from == "kernelBootChanges":
-        kernelBootChanges(distro)
-        saveProgress("1", "kernelBootChanges")
+# ANSI color codes
+BLUE = "\033[94m"
+RESET = "\033[0m"
 
-    clearProgress()
-
-def choice_2(distro):
-    progress = loadProgress()
-    step = progress["step"] if progress and progress["choice"] == "2" else None
-
-    if step is None or step == "get_windows_iso":
-        iso_file = get_windows_iso()
-        saveProgress("2", "get_vm_config")
+def show_menu(options, title="Menu"):
+    """
+    Display an interactive menu with arrow key navigation
     
-    if step is None or step == "get_vm_config":
-        vm_name, memory, vcpus, diskSize, sockets, cores, threads = get_vm_config()
-        saveProgress("2", "create_vm")
+    Args:
+        options: List of tuples (display_text, return_value)
+        title: Title to display above the menu (can be None to skip)
     
-    if step is None or step == "create_vm":
-        create_vm(iso_file, vm_name, memory, vcpus, diskSize, sockets, cores, threads, distro)
-        saveProgress("2", "modify_storage_bus")
+    Returns:
+        The return_value of the selected option
+    """
+    selected = 0
     
-    if step is None or step == "modify_storage_bus":
-        modify_storage_bus(vm_name)
-        saveProgress("2", "update_display_to_vnc")
-    
-    if step is None or step == "update_display_to_vnc":
-        update_display_to_vnc(vm_name, distro)
-        saveProgress("2", "setup_libvirt_hooks")
-    
-    if step is None or step == "setup_libvirt_hooks":
-        setup_libvirt_hooks(vm_name)
-        saveProgress("2", "update_start_sh")
-    
-    if step is None or step == "update_start_sh":
-        update_start_sh(vm_name)
-        saveProgress("2", "update_revert_sh")
-
-    if step is None or step == "update_revert_sh":
-        update_revert_sh(vm_name)
-        saveProgress("2", "add_gpu_passthrough_devices")
-
-    if step is None or step == "add_gpu_passthrough_devices":
-        add_gpu_passthrough_devices(vm_name)
-        saveProgress("2", "cleanupDrives")
-    
-    if step is None or step == "cleanupDrives":
-        cleanupDrives(vm_name)
-    
-    clearProgress()
-    print("---  Script has completed!   ---")
-    sys.exit(0)
-
-def main():
-    print("Welcome! What would you like to do?")
-
     while True:
-        print("1) Run Kernel Boot Changes (1st time)")
-        print("2) Run remaining operations (if kernel boot changes were done already)")
-        print("3) Run a specific function (Only choose this if there was an issue in the 2nd part)")
-        choice = input("Enter 1, 2, or 3: ").strip()
+        # Clear screen and move cursor to top
+        print("\033[2J\033[H", end="")
 
-        if choice in ("1", "2", "3"):
-            break
-        else:
-            print("Invalid choice. Please enter either 1, 2, or 3\n")
+        # Print ASCII art header
+        print(f"{BLUE}")
+        print(r" __  __  ____    ______   _____   __  __     ")
+        print(r"/\ \/\ \/\  _`\ /\__  _\ /\  __`\/\ \/\ \    ")
+        print(r"\ \ \ \ \ \ \L\_\/_/\ \/ \ \ \/\ \ \ \_\ \   ")
+        print(r" \ \ \ \ \ \  _\/  \ \ \  \ \ \ \ \ \  _  \  ")
+        print(r"  \ \ \_/ \ \ \/    \_\ \__\ \ \_\ \ \ \ \ \ ")
+        print(r"   \ `\___/\ \_\    /\_____\\ \_____\ \_\ \_\ ")
+        print(r"    `\/__/  \/_/    \/_____/ \/_____/\/_/\/_/")
+        print(f"{RESET}")
+        print("Welcome! What would you like to do?")
+        print("\nUse ↑/↓ arrow keys to navigate, Enter to select:\n")
+        
+        # Print menu options
+        for i, (text, _) in enumerate(options):
+            if i == selected:
+                print(f"  > {text}")
+            else:
+                print(f"    {text}")
+        
+        # Get user input
+        key = get_key()
+        
+        # Handle arrow keys
+        if key == '\x1b[A':  # Up arrow
+            selected = (selected - 1) % len(options)
+        elif key == '\x1b[B':  # Down arrow
+            selected = (selected + 1) % len(options)
+        elif key == '\r' or key == '\n':  # Enter
+            return options[selected][1]
+        elif key == '\x03':  # Ctrl+C
+            print("\n\nExiting...")
+            sys.exit(0)
 
-    distro = get_distro()
-    if choice == "1":
-        choice_1(distro)
-    elif choice == "2":
-        choice_2(distro)
-    else:
+class Api:
+    def __init__(self):
+        self.distro = get_distro()
+
+    def _run_in_thread(self, target, args=()):
+        thread = threading.Thread(target=target, args=args)
+        thread.daemon = True
+        thread.start()
+
+    def _log_and_run(self, func, *args):
+        # Create a string buffer to capture output
+        output_buffer = io.StringIO()
+        
+        # Redirect stdout to our buffer
+        old_stdout = sys.stdout
+        sys.stdout = output_buffer
+        
+        try:
+            # Run the function
+            func(*args)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Restore stdout
+            sys.stdout = old_stdout
+            
+            # Get the captured output
+            output = output_buffer.getvalue()
+            output_buffer.close()
+            
+            # Send each line to the log
+            for line in output.splitlines():
+                self.log_message(line)
+                time.sleep(0.01)  # Prevents flooding
+
+    def log_message(self, msg):
+        # Ensure we have a string
+        if not isinstance(msg, str):
+            msg = str(msg)
+        print(msg)
+
+    def _execute_choice_1(self):
+        self.log_message("Starting Step 1: Preparing Host System...")
+        
+        # Test message to verify logging is working
+        self.log_message("DEBUG: Testing log output...")
+        
+        self.log_message("\n--- Running Installations ---")
+        try:
+            self._log_and_run(installations, self.distro)
+            self.log_message("DEBUG: Installations completed")
+        except Exception as e:
+            self.log_message(f"ERROR in installations: {e}")
+        
+        self.log_message("\n--- Applying Kernel Boot Changes ---")
+        try:
+            self._log_and_run(kernelBootChanges, self.distro)
+            self.log_message("DEBUG: Kernel boot changes completed")
+        except Exception as e:
+            self.log_message(f"ERROR in kernelBootChanges: {e}")
+        
+        self.log_message("\nHost preparation complete. A reboot is required.")
+        self.log_message("You can reboot from your system menu, or run 'sudo reboot' in a terminal.")
+        self.log_message("After rebooting, please run this application again and choose option 2.")
+
+    def prepare_choice_2(self):
+        """Placeholder for choice 2 implementation"""
+        self.log_message("Executing Choice 2: Create VM & Passthrough GPU")
+        # Add your implementation here
+        pass
+
+    def start_choice_3(self):
+        """Placeholder for choice 3 implementation"""
+        self.log_message("Executing Choice 3: Resume Previous Setup")
         progress = loadProgress()
-        if not progress:
-            print("No previous progress to resume.")
-        elif progress["choice"] == "1":
-            choice_1(distro)
-        elif progress["choice"] == "2":
-            choice_2(distro)
+        if progress:
+            self.log_message(f"Found saved progress: {progress}")
         else:
-            print("Unknown progress found.")
-        sys.exit(0)
+            self.log_message("No saved progress found.")
+        # Add your implementation here
+        pass
+
+def run_terminal_mode():
+    """Run the application in terminal mode"""
+    api = Api()
+    
+    # Check for root privileges
+    if os.geteuid() != 0:
+        print("Root privileges are required. Please run with sudo.")
+        sys.exit(1)
+    
+    while True:
+        # Define menu options as (display_text, return_value) tuples
+        menu_options = [
+            ("Prepare Host System (Kernel Updates & Reboot)", "1"),
+            ("Create VM & Passthrough GPU", "2"),
+            ("Resume Previous Setup", "3"),
+            ("Exit", "4")
+        ]
+        
+        choice = show_menu(menu_options)
+        
+        # Clear screen for execution
+        print("\033[2J\033[H", end="")
+        
+        if choice == "1":
+            api._execute_choice_1()
+            input("\nPress Enter to continue...")
+        elif choice == "2":
+            api.prepare_choice_2()
+            input("\nPress Enter to continue...")
+        elif choice == "3":
+            api.start_choice_3()
+            input("\nPress Enter to continue...")
+        elif choice == "4":
+            print("Exiting...")
+            break
 
 if __name__ == "__main__":
-    main()
+    #run_terminal_mode()
+    failed2find()
