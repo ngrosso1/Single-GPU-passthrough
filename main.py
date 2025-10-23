@@ -7,7 +7,7 @@ import time
 import tty
 import termios
 
-from kernelUpdates import installations, failed2find, kernelBootChanges, reboot_system
+from kernelUpdates import installations, kernelBootChanges, reboot_system
 from vmCreation import get_sys_info, create_vm, modify_storage_bus, update_display_to_vnc, cleanupDrives
 from getISO import ensure_libvirt_access, virtioDrivers
 from hooks import setup_libvirt_hooks, update_start_sh, update_revert_sh, add_gpu_passthrough_devices
@@ -229,5 +229,4 @@ def run_terminal_mode():
             break
 
 if __name__ == "__main__":
-    #run_terminal_mode()
-    failed2find()
+    run_terminal_mode()

@@ -63,8 +63,28 @@ def show_package_manager_menu(options):
             print("\n\nExiting...")
             sys.exit(0)
 
-def failed2find():
-    # Distro not recognized, show package manager selection menu
+def installations(distro):
+    commands = {
+        "pop": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
+        "manjaro": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf -y",
+        "debian": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
+        "opensuse": "zypper in libvirt libvirt-client libvirt-daemon virt-manager virt-install virt-viewer qemu qemu-kvm qemu-ovmf-x86_64 qemu-tools -y",
+        "linuxmint": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
+        "arch": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf swtpm qemu-full -y",
+        "ubuntu": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
+        "fedora": "dnf5 install @virtualization",
+        "endeavouros": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf -y"
+    }
+
+    if distro in commands:
+        print(f"Installing packages for {distro.capitalize()}...")
+        try:
+            subprocess.run(commands[distro], shell=True, check=True)
+            print(f"Installation for {distro.capitalize()} completed.")
+        except subprocess.CalledProcessError as e:
+            print(f"🚨 Error 🚨 during installation: {RED}{e}{RESET}")
+    else:
+        # Distro not recognized, show package manager selection menu
         package_manager_commands = {
             "apt": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
             "pacman": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf swtpm qemu-full -y",
@@ -111,29 +131,6 @@ def failed2find():
                 print("\nIf the installation failed, you may need to install manually.")
                 print("Press Enter to continue...")
                 input()
-
-def installations(distro):
-    commands = {
-        "pop": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
-        "manjaro": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf -y",
-        "debian": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
-        "opensuse": "zypper in libvirt libvirt-client libvirt-daemon virt-manager virt-install virt-viewer qemu qemu-kvm qemu-ovmf-x86_64 qemu-tools -y",
-        "linuxmint": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
-        "arch": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf swtpm qemu-full -y",
-        "ubuntu": "apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager ovmf openssh-server -y",
-        "fedora": "dnf5 install @virtualization",
-        "endeavouros": "pacman -S virt-manager qemu vde2 ebtables iptables-nft nftables dnsmasq bridge-utils ovmf -y"
-    }
-
-    if distro in commands:
-        print(f"Installing packages for {distro.capitalize()}...")
-        try:
-            subprocess.run(commands[distro], shell=True, check=True)
-            print(f"Installation for {distro.capitalize()} completed.")
-        except subprocess.CalledProcessError as e:
-            print(f"🚨 Error 🚨 during installation: {RED}{e}{RESET}")
-    else:
-        failed2find()
 
 def checkCPU():
     #Checking if AMD or Intel
