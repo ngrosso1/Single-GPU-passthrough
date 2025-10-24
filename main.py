@@ -7,7 +7,7 @@ import time
 import tty
 import termios
 
-from kernelUpdates import installations, kernelBootChanges, reboot_system
+from kernelUpdates import installations, kernelBootChanges_no_prompt, reboot_system
 from vmCreation import get_sys_info, create_vm, modify_storage_bus, update_display_to_vnc, cleanupDrives
 from getISO import ensure_libvirt_access, virtioDrivers
 from hooks import setup_libvirt_hooks, update_start_sh, update_revert_sh, add_gpu_passthrough_devices
@@ -19,7 +19,7 @@ def saveProgress(choice, step, data=None):
     if data:
         progress["data"] = data
     with open(PROGRESS_FILE, "w") as f:
-        json.dump({"choice": choice, "step": step}, f)
+        json.dump(progress, f)
 
 def loadProgress():
     if os.path.exists(PROGRESS_FILE):
@@ -76,13 +76,11 @@ def show_menu(options, title="Menu"):
 
         # Print ASCII art header
         print(f"{BLUE}")
-        print(r" __  __  ____    ______   _____   __  __     ")
-        print(r"/\ \/\ \/\  _`\ /\__  _\ /\  __`\/\ \/\ \    ")
-        print(r"\ \ \ \ \ \ \L\_\/_/\ \/ \ \ \/\ \ \ \_\ \   ")
-        print(r" \ \ \ \ \ \  _\/  \ \ \  \ \ \ \ \ \  _  \  ")
-        print(r"  \ \ \_/ \ \ \/    \_\ \__\ \ \_\ \ \ \ \ \ ")
-        print(r"   \ `\___/\ \_\    /\_____\\ \_____\ \_\ \_\ ")
-        print(r"    `\/__/  \/_/    \/_____/ \/_____/\/_/\/_/")
+        print(r" _    ________________  __  __")
+        print(r"| |  / / ____/  _/ __ \/ / / /")
+        print(r"| | / / /_   / // / / / /_/ / ")
+        print(r"| |/ / __/ _/ // /_/ / __  /  ")
+        print(r"|___/_/   /___/\____/_/ /_/   ")
         print(f"{RESET}")
         print("Welcome! What would you like to do?")
         print("\nUse ↑/↓ arrow keys to navigate, Enter to select:\n")
@@ -90,7 +88,7 @@ def show_menu(options, title="Menu"):
         # Print menu options
         for i, (text, _) in enumerate(options):
             if i == selected:
-                print(f"  > {text}")
+                print(f"  > \033[4m{text}\033[0m")  # Underlined for selected item
             else:
                 print(f"    {text}")
         
@@ -151,7 +149,11 @@ class Api:
             msg = str(msg)
         print(msg)
 
+    def start_choice_1(self):
+        self._run_in_thread(self._execute_choice_1)
+
     def _execute_choice_1(self):
+        saveProgress(1, 1)
         self.log_message("Starting Step 1: Preparing Host System...")
         
         # Test message to verify logging is working
@@ -161,36 +163,202 @@ class Api:
         try:
             self._log_and_run(installations, self.distro)
             self.log_message("DEBUG: Installations completed")
+            saveProgress(1, 2)
         except Exception as e:
             self.log_message(f"ERROR in installations: {e}")
+            return
         
         self.log_message("\n--- Applying Kernel Boot Changes ---")
         try:
-            self._log_and_run(kernelBootChanges, self.distro)
+            self._log_and_run(kernelBootChanges_no_prompt, self.distro)
             self.log_message("DEBUG: Kernel boot changes completed")
+            saveProgress(1, 3)
         except Exception as e:
-            self.log_message(f"ERROR in kernelBootChanges: {e}")
+            self.log_message(f"ERROR in kernelBootChanges_no_prompt: {e}")
+            return
         
         self.log_message("\nHost preparation complete. A reboot is required.")
         self.log_message("You can reboot from your system menu, or run 'sudo reboot' in a terminal.")
         self.log_message("After rebooting, please run this application again and choose option 2.")
+        saveProgress(1, "complete")
 
-    def prepare_choice_2(self):
-        """Placeholder for choice 2 implementation"""
-        self.log_message("Executing Choice 2: Create VM & Passthrough GPU")
-        # Add your implementation here
-        pass
+    def start_choice_2(self):
+        self._run_in_thread(self._execute_choice_2)
+
+    def _execute_choice_2(self):
+        saveProgress(2, 1)
+        self.log_message("Starting Step 2: Creating VM and Setting Up GPU Passthrough...")
+        
+        self.log_message("\n--- Getting System Information ---")
+        try:
+            sys_info = get_sys_info()
+            saveProgress(2, 2, {"sys_info": sys_info})
+            self.log_message(f"System info gathered: {sys_info}")
+        except Exception as e:
+            self.log_message(f"ERROR getting system info: {e}")
+            return
+        
+        self.log_message("\n--- Ensuring Libvirt Access ---")
+        try:
+            ensure_libvirt_access()
+            saveProgress(2, 3)
+        except Exception as e:
+            self.log_message(f"ERROR ensuring libvirt access: {e}")
+            return
+        
+        self.log_message("\n--- Downloading VirtIO Drivers ---")
+        try:
+            virtioDrivers()
+            saveProgress(2, 4)
+        except Exception as e:
+            self.log_message(f"ERROR downloading virtio drivers: {e}")
+            return
+        
+        self.log_message("\n--- Creating VM ---")
+        try:
+            vm_name = create_vm()
+            saveProgress(2, 5, {"vm_name": vm_name})
+            self.log_message(f"VM created: {vm_name}")
+        except Exception as e:
+            self.log_message(f"ERROR creating VM: {e}")
+            return
+        
+        self.log_message("\n--- Modifying Storage Bus ---")
+        try:
+            modify_storage_bus(vm_name)
+            saveProgress(2, 6)
+        except Exception as e:
+            self.log_message(f"ERROR modifying storage bus: {e}")
+            return
+        
+        self.log_message("\n--- Updating Display to VNC ---")
+        try:
+            update_display_to_vnc(vm_name)
+            saveProgress(2, 7)
+        except Exception as e:
+            self.log_message(f"ERROR updating display: {e}")
+            return
+        
+        self.log_message("\n--- Cleaning Up Drives ---")
+        try:
+            cleanupDrives(vm_name)
+            saveProgress(2, 8)
+        except Exception as e:
+            self.log_message(f"ERROR cleaning up drives: {e}")
+            return
+        
+        self.log_message("\n--- Setting Up Libvirt Hooks ---")
+        try:
+            setup_libvirt_hooks()
+            saveProgress(2, 9)
+        except Exception as e:
+            self.log_message(f"ERROR setting up hooks: {e}")
+            return
+        
+        self.log_message("\n--- Updating start.sh Script ---")
+        try:
+            update_start_sh(vm_name)
+            saveProgress(2, 10)
+        except Exception as e:
+            self.log_message(f"ERROR updating start.sh: {e}")
+            return
+        
+        self.log_message("\n--- Updating revert.sh Script ---")
+        try:
+            update_revert_sh(vm_name)
+            saveProgress(2, 11)
+        except Exception as e:
+            self.log_message(f"ERROR updating revert.sh: {e}")
+            return
+        
+        self.log_message("\n--- Adding GPU Passthrough Devices ---")
+        try:
+            add_gpu_passthrough_devices(vm_name)
+            saveProgress(2, 12)
+        except Exception as e:
+            self.log_message(f"ERROR adding GPU passthrough: {e}")
+            return
+        
+        self.log_message("\n=== VM Setup Complete! ===")
+        self.log_message(f"Your VM '{vm_name}' is ready with GPU passthrough configured.")
+        clearProgress()
 
     def start_choice_3(self):
-        """Placeholder for choice 3 implementation"""
-        self.log_message("Executing Choice 3: Resume Previous Setup")
+        self._run_in_thread(self._execute_choice_3)
+
+    def _execute_choice_3(self):
+        self.log_message("Checking for saved progress...")
         progress = loadProgress()
-        if progress:
-            self.log_message(f"Found saved progress: {progress}")
-        else:
-            self.log_message("No saved progress found.")
-        # Add your implementation here
-        pass
+        
+        if not progress:
+            self.log_message("No saved progress found. Please start from the beginning.")
+            return
+        
+        choice = progress.get("choice")
+        step = progress.get("step")
+        data = progress.get("data", {})
+        
+        self.log_message(f"Found saved progress: Choice {choice}, Step {step}")
+        
+        if choice == 1:
+            self.log_message("Choice 1 (Host preparation) was in progress.")
+            self.log_message("Please restart Choice 1 from the beginning as kernel changes cannot be partially resumed.")
+            return
+        
+        if choice == 2:
+            self.log_message("Resuming VM creation from saved checkpoint...")
+            vm_name = data.get("vm_name", "win10")
+            
+            # Resume from the saved step
+            if step < 5:
+                self.log_message("Restarting from the beginning of VM creation...")
+                self._execute_choice_2()
+            elif step == 5:
+                self.log_message(f"Resuming with VM: {vm_name}")
+                self.log_message("\n--- Modifying Storage Bus ---")
+                modify_storage_bus(vm_name)
+                saveProgress(2, 6)
+                # Continue with remaining steps...
+                self._continue_choice_2_from_step_6(vm_name)
+            else:
+                self.log_message(f"Resuming from step {step}...")
+                self._continue_choice_2_from_step(vm_name, step)
+
+    def _continue_choice_2_from_step_6(self, vm_name):
+        """Continue choice 2 from step 6 onwards"""
+        self.log_message("\n--- Updating Display to VNC ---")
+        update_display_to_vnc(vm_name)
+        saveProgress(2, 7)
+        
+        self.log_message("\n--- Cleaning Up Drives ---")
+        cleanupDrives(vm_name)
+        saveProgress(2, 8)
+        
+        self.log_message("\n--- Setting Up Libvirt Hooks ---")
+        setup_libvirt_hooks()
+        saveProgress(2, 9)
+        
+        self.log_message("\n--- Updating start.sh Script ---")
+        update_start_sh(vm_name)
+        saveProgress(2, 10)
+        
+        self.log_message("\n--- Updating revert.sh Script ---")
+        update_revert_sh(vm_name)
+        saveProgress(2, 11)
+        
+        self.log_message("\n--- Adding GPU Passthrough Devices ---")
+        add_gpu_passthrough_devices(vm_name)
+        saveProgress(2, 12)
+        
+        self.log_message("\n=== VM Setup Complete! ===")
+        self.log_message(f"Your VM '{vm_name}' is ready with GPU passthrough configured.")
+        clearProgress()
+
+    def _continue_choice_2_from_step(self, vm_name, step):
+        """Continue from any step in choice 2"""
+        # This is a simplified version - expand as needed
+        if step >= 6:
+            self._continue_choice_2_from_step_6(vm_name)
 
 def run_terminal_mode():
     """Run the application in terminal mode"""
@@ -216,13 +384,19 @@ def run_terminal_mode():
         print("\033[2J\033[H", end="")
         
         if choice == "1":
-            api._execute_choice_1()
+            api.start_choice_1()
+            # Wait for thread to complete
+            time.sleep(1)
             input("\nPress Enter to continue...")
         elif choice == "2":
-            api.prepare_choice_2()
+            api.start_choice_2()
+            # Wait for thread to complete
+            time.sleep(1)
             input("\nPress Enter to continue...")
         elif choice == "3":
             api.start_choice_3()
+            # Wait for thread to complete
+            time.sleep(1)
             input("\nPress Enter to continue...")
         elif choice == "4":
             print("Exiting...")

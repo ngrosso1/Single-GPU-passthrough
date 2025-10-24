@@ -3,10 +3,20 @@ import os
 import sys
 import tty
 import termios
+import json
 
 RED = '\033[91m'   
 RESET = '\033[0m'
 BLUE = '\033[94m'
+
+PROGRESS_FILE = "progress.json"
+
+def saveProgress(choice, step, data=None):
+    progress = {"choice": choice, "step": step}
+    if data:
+        progress["data"] = data
+    with open(PROGRESS_FILE, "w") as f:
+        json.dump(progress, f)
 
 def get_key():
     """Get a single keypress from the terminal"""
@@ -45,7 +55,7 @@ def show_package_manager_menu(options):
         # Print menu options
         for i, (text, _) in enumerate(options):
             if i == selected:
-                print(f"  > {text}")
+                print(f"  > \033[4m{text}\033[0m")  # Underlined for selected item
             else:
                 print(f"    {text}")
         
@@ -273,7 +283,48 @@ def sysChanges():
     else:
         print("IOMMU options already present. No changes made.")
 
-def kernelBootChanges(distro):
+def show_bootloader_menu(options, title):
+    """
+    Display an interactive menu with arrow key navigation for bootloader/initramfs selection
+    
+    Args:
+        options: List of tuples (display_text, return_value)
+        title: Title message to display
+    
+    Returns:
+        The return_value of the selected option
+    """
+    selected = 0
+    
+    while True:
+        # Clear screen and move cursor to top
+        print("\033[2J\033[H", end="")
+        
+        print(f"{RED}{title}{RESET}")
+        print("\nUse ↑/↓ arrow keys to navigate, Enter to select:\n")
+        
+        # Print menu options
+        for i, (text, _) in enumerate(options):
+            if i == selected:
+                print(f"  > \033[4m{text}\033[0m")  # Underlined for selected item
+            else:
+                print(f"    {text}")
+        
+        # Get user input
+        key = get_key()
+        
+        # Handle arrow keys
+        if key == '\x1b[A':  # Up arrow
+            selected = (selected - 1) % len(options)
+        elif key == '\x1b[B':  # Down arrow
+            selected = (selected + 1) % len(options)
+        elif key == '\r' or key == '\n':  # Enter
+            return options[selected][1]
+        elif key == '\x03':  # Ctrl+C
+            print("\n\nExiting...")
+            sys.exit(0)
+
+def kernelBootChanges_no_prompt(distro):
     if distro == "pop":
         print("Pop!_OS detected!")
         popChanges()
@@ -281,7 +332,7 @@ def kernelBootChanges(distro):
     elif distro == "fedora":
         print("Fedora detected!")
         # grubChanges() # This seems to target /etc/sysconfig/grub which is for legacy systems
-        # dracutKernelBootChanges() # This is correct for modern Fedora
+        dracutKernelBootChanges() # This is correct for modern Fedora
     elif distro == "debian":
         print("Debian detected!")
         grubChanges()
@@ -299,11 +350,83 @@ def kernelBootChanges(distro):
         grubChanges()
         initramfsKernelBootChanges()
     elif distro == "arch":
+        print("Arch Linux detected!")
         sysChanges()
         #initramfsKernelBootChanges()
     else:
-        print("🚨 Distro not supported 🚨")
-        sys.exit(1)
+        # Distro not recognized, prompt for bootloader
+        print(f"{RED}Unable to identify your distribution!{RESET}")
+        
+        bootloader_options = [
+            ("GRUB", "grub"),
+            ("systemd-boot", "systemd-boot"),
+            ("I'll configure manually", "manual")
+        ]
+        
+        selected_bootloader = show_bootloader_menu(
+            bootloader_options,
+            "Unable to identify your distribution!\n\nPlease select your bootloader:"
+        )
+        
+        if selected_bootloader == "manual":
+            print("\n" + "="*60)
+            print(f"{BLUE}Manual Bootloader Configuration Required{RESET}")
+            print("="*60)
+            print("\nPlease manually configure your bootloader to enable IOMMU.")
+            print("\nFor AMD CPUs, add: amd_iommu=on iommu=pt")
+            print("For Intel CPUs, add: intel_iommu=on iommu=pt")
+            print("\nAfter configuration, please rerun this script and")
+            print("select 'Resume Previous Setup' from the main menu.")
+            print("\nSaving progress to resume at VM creation step...")
+            saveProgress(1, "complete")
+            print("\nPress Enter to exit...")
+            input()
+            sys.exit(0)
+        elif selected_bootloader == "grub":
+            print("\nConfiguring GRUB bootloader...")
+            grubChanges()
+        elif selected_bootloader == "systemd-boot":
+            print("\nConfiguring systemd-boot...")
+            sysChanges()
+        
+        # Now prompt for initramfs system
+        initramfs_options = [
+            ("initramfs-tools (Debian/Ubuntu)", "initramfs"),
+            ("dracut (Fedora/openSUSE)", "dracut"),
+            ("I'll configure manually", "manual")
+        ]
+        
+        selected_initramfs = show_bootloader_menu(
+            initramfs_options,
+            "Please select your Initial RAM Filesystem system:"
+        )
+        
+        if selected_initramfs == "manual":
+            print("\n" + "="*60)
+            print(f"{BLUE}Manual Initramfs Configuration Required{RESET}")
+            print("="*60)
+            print("\nPlease manually configure your Initial RAM Filesystem")
+            print("to include the following VFIO modules:")
+            print("  - vfio")
+            print("  - vfio_iommu_type1")
+            print("  - vfio_pci")
+            print("  - vfio_virqfd")
+            print("\nAfter configuration, please rerun this script and")
+            print("select 'Resume Previous Setup' from the main menu.")
+            print("\nSaving progress to resume at VM creation step...")
+            saveProgress(1, "complete")
+            print("\nPress Enter to exit...")
+            input()
+            sys.exit(0)
+        elif selected_initramfs == "initramfs":
+            print("\nConfiguring initramfs-tools...")
+            initramfsKernelBootChanges()
+        elif selected_initramfs == "dracut":
+            print("\nConfiguring dracut...")
+            dracutKernelBootChanges()
+        
+        print("\nBootloader and initramfs configuration complete!")
+        print("A reboot is required for changes to take effect.")
 
 def reboot_system():
     """Reboots the system."""
