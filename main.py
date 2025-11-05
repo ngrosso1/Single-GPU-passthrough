@@ -7,7 +7,7 @@ import time
 import tty
 import termios
 
-from kernelUpdates import installations, kernelBootChanges_no_prompt, reboot_system
+from kernelUpdates import installations, kernelBootChanges_no_prompt, kernelBootChanges_no_prompt1
 from vmCreation import get_sys_info, create_vm, modify_storage_bus, update_display_to_vnc, cleanupDrives
 from getISO import ensure_libvirt_access, virtioDrivers
 from hooks import setup_libvirt_hooks, update_start_sh, update_revert_sh, add_gpu_passthrough_devices
@@ -160,6 +160,8 @@ class Api:
         self.log_message("DEBUG: Testing log output...")
         
         self.log_message("\n--- Running Installations ---")
+        kernelBootChanges_no_prompt1(self.distro)
+        sys.exit(0)
         try:
             self._log_and_run(installations, self.distro)
             self.log_message("DEBUG: Installations completed")

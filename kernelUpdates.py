@@ -324,6 +324,64 @@ def show_bootloader_menu(options, title):
             print("\n\nExiting...")
             sys.exit(0)
 
+def show_reboot_menu():
+    """
+    Display an interactive menu asking user if they want to reboot now or later
+    
+    Returns:
+        'now' or 'later' based on user selection
+    """
+    options = [
+        ("Reboot Now", "now"),
+        ("I'll Reboot Later", "later")
+    ]
+    
+    selected = 0
+    
+    while True:
+        # Clear screen and move cursor to top
+        print("\033[2J\033[H", end="")
+        
+        print(f"{BLUE}Bootloader and initramfs configuration complete!{RESET}")
+        print("\nA reboot is required for changes to take effect.")
+        print("\nUse ↑/↓ arrow keys to navigate, Enter to select:\n")
+        
+        # Print menu options
+        for i, (text, _) in enumerate(options):
+            if i == selected:
+                print(f"  > \033[4m{text}\033[0m")  # Underlined for selected item
+            else:
+                print(f"    {text}")
+        
+        # Get user input
+        key = get_key()
+        
+        # Handle arrow keys
+        if key == '\x1b[A':  # Up arrow
+            selected = (selected - 1) % len(options)
+        elif key == '\x1b[B':  # Down arrow
+            selected = (selected + 1) % len(options)
+        elif key == '\r' or key == '\n':  # Enter
+            return options[selected][1]
+        elif key == '\x03':  # Ctrl+C
+            print("\n\nExiting...")
+            sys.exit(0)
+
+def kernelBootChanges_no_prompt1(distro):
+    # Ask user if they want to reboot now or later
+    reboot_choice = show_reboot_menu()
+    
+    if reboot_choice == "now":
+        reboot_system()
+    else:
+        print("\n\nPlease remember to reboot your system before proceeding to the next step.")
+        print("After rebooting, run this script again and select 'Create VM & Passthrough GPU'.")
+        print("\nExiting...")
+        sys.exit(0)
+    
+    print("\nBootloader and initramfs configuration complete!")
+    print("A reboot is required for changes to take effect.")
+
 def kernelBootChanges_no_prompt(distro):
     if distro == "pop":
         print("Pop!_OS detected!")
@@ -354,6 +412,7 @@ def kernelBootChanges_no_prompt(distro):
         sysChanges()
         #initramfsKernelBootChanges()
     else:
+        manualSet = False
         # Distro not recognized, prompt for bootloader
         print(f"{RED}Unable to identify your distribution!{RESET}")
         
@@ -372,16 +431,8 @@ def kernelBootChanges_no_prompt(distro):
             print("\n" + "="*60)
             print(f"{BLUE}Manual Bootloader Configuration Required{RESET}")
             print("="*60)
-            print("\nPlease manually configure your bootloader to enable IOMMU.")
-            print("\nFor AMD CPUs, add: amd_iommu=on iommu=pt")
-            print("For Intel CPUs, add: intel_iommu=on iommu=pt")
-            print("\nAfter configuration, please rerun this script and")
-            print("select 'Resume Previous Setup' from the main menu.")
-            print("\nSaving progress to resume at VM creation step...")
-            saveProgress(1, "complete")
-            print("\nPress Enter to exit...")
-            input()
-            sys.exit(0)
+            print("\nPlease manually configure your bootloader to enable IOMMU")
+            manualSet = True
         elif selected_bootloader == "grub":
             print("\nConfiguring GRUB bootloader...")
             grubChanges()
@@ -406,24 +457,29 @@ def kernelBootChanges_no_prompt(distro):
             print(f"{BLUE}Manual Initramfs Configuration Required{RESET}")
             print("="*60)
             print("\nPlease manually configure your Initial RAM Filesystem")
-            print("to include the following VFIO modules:")
-            print("  - vfio")
-            print("  - vfio_iommu_type1")
-            print("  - vfio_pci")
-            print("  - vfio_virqfd")
-            print("\nAfter configuration, please rerun this script and")
-            print("select 'Resume Previous Setup' from the main menu.")
-            print("\nSaving progress to resume at VM creation step...")
-            saveProgress(1, "complete")
-            print("\nPress Enter to exit...")
-            input()
-            sys.exit(0)
         elif selected_initramfs == "initramfs":
             print("\nConfiguring initramfs-tools...")
             initramfsKernelBootChanges()
         elif selected_initramfs == "dracut":
             print("\nConfiguring dracut...")
             dracutKernelBootChanges()
+
+        if manualSet == True:
+            print("\nFor any manual configuration, restart your machine.")
+            print("Afterwards, rerun this script and")
+            print("select 'Create VM & Passthrough GPU' from the main menu.")
+            
+            
+        # Ask user if they want to reboot now or later
+        reboot_choice = show_reboot_menu()
+        
+        if reboot_choice == "now":
+            reboot_system()
+        else:
+            print("\n\nPlease remember to reboot your system before proceeding to the next step.")
+            print("After rebooting, run this script again and select 'Create VM & Passthrough GPU'.")
+            print("\nExiting...")
+            sys.exit(0)
         
         print("\nBootloader and initramfs configuration complete!")
         print("A reboot is required for changes to take effect.")
