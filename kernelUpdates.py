@@ -367,21 +367,6 @@ def show_reboot_menu():
             print("\n\nExiting...")
             sys.exit(0)
 
-def kernelBootChanges_no_prompt1(distro):
-    # Ask user if they want to reboot now or later
-    reboot_choice = show_reboot_menu()
-    
-    if reboot_choice == "now":
-        reboot_system()
-    else:
-        print("\n\nPlease remember to reboot your system before proceeding to the next step.")
-        print("After rebooting, run this script again and select 'Create VM & Passthrough GPU'.")
-        print("\nExiting...")
-        sys.exit(0)
-    
-    print("\nBootloader and initramfs configuration complete!")
-    print("A reboot is required for changes to take effect.")
-
 def kernelBootChanges_no_prompt(distro):
     if distro == "pop":
         print("Pop!_OS detected!")

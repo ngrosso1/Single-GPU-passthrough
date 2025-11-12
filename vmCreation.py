@@ -4,7 +4,7 @@ import libvirt
 import getpass
 import socket
 import sys
-from getISO import virtioDrivers
+from getISO import virtioDrivers, get_windows_iso
 
 BLUE = '\033[94m'
 GREEN = '\033[92m'
@@ -123,8 +123,11 @@ def get_vm_config():
 
     return vm_name, memory, tvcpus, diskSize, sockets, cores, threads
 
-def create_vm(iso_file, vm_name, memory, vcpus, diskSize, sockets, cores, threads, distro):
+def create_vm(distro):
     """Use virt-install to create a VM using the provided Windows ISO."""
+
+    iso_file = get_windows_iso()
+    vm_name, memory, vcpus, diskSize, sockets, cores, threads = get_vm_config()
 
     if distro == "arch":
         subprocess.run(["systemctl", "enable", "libvertd"])
@@ -171,14 +174,16 @@ def create_vm(iso_file, vm_name, memory, vcpus, diskSize, sockets, cores, thread
         print("======================================================================================")
         while True:
             user_input = input("Do you want to proceed (Y/n)?").strip().lower()
-        
+
             if user_input in ("yes", "y", ""):
                 print("Proceeding to the next function...")
                 break
             else:
                 print("Waiting for confirmation...")
+        return vm_name
     except subprocess.CalledProcessError as e:
         print(f"🚨 Error 🚨 during VM creation: {RED}{e}{RESET}")
+        return None
 
 def cleanupDrives(vm_name):
     """

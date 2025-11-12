@@ -42,5 +42,9 @@ This script will help install, configure, and run a single GPU passthrough for a
     There should be a nvidia driver or service in use as shown by the output. Add them to the hooks scripts below (replace {vm_name} with the name of your vm)
     * /etc/libvirt/hooks/qemu.d/{vm_name}/prepare/begin/start.sh
     * /etc/libvirt/hooks/qemu.d/{vm_name}/release/end/revert.sh
+* If you are having issues trying to move your VM to an external drive:
+    * Ensure you have said drive mounted
+    * exFat (and any others that do not have file permissions) can cause issues with qemu
+    * If the external drive has a different file system that you have the proper package installed on your system. For NTFS it usually is ntfs-3g, exFat (not recomended) is exfat-utils, etc.
 
 

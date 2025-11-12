@@ -7,7 +7,7 @@ import time
 import tty
 import termios
 
-from kernelUpdates import installations, kernelBootChanges_no_prompt, kernelBootChanges_no_prompt1
+from kernelUpdates import installations, kernelBootChanges_no_prompt
 from vmCreation import get_sys_info, create_vm, modify_storage_bus, update_display_to_vnc, cleanupDrives
 from getISO import ensure_libvirt_access, virtioDrivers
 from hooks import setup_libvirt_hooks, update_start_sh, update_revert_sh, add_gpu_passthrough_devices
@@ -54,7 +54,7 @@ def get_key():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 # ANSI color codes
-BLUE = "\033[94m"
+BLUE = "\033[1;32m"
 RESET = "\033[0m"
 
 def show_menu(options, title="Menu"):
@@ -72,7 +72,7 @@ def show_menu(options, title="Menu"):
     
     while True:
         # Clear screen and move cursor to top
-        print("\033[2J\033[H", end="")
+        print("\033[2J\033[H", end="", flush=True)
 
         # Print ASCII art header
         print(f"{BLUE}")
@@ -92,7 +92,6 @@ def show_menu(options, title="Menu"):
             else:
                 print(f"    {text}")
         
-        # Get user input
         key = get_key()
         
         # Handle arrow keys
@@ -102,7 +101,7 @@ def show_menu(options, title="Menu"):
             selected = (selected + 1) % len(options)
         elif key == '\r' or key == '\n':  # Enter
             return options[selected][1]
-        elif key == '\x03':  # Ctrl+C
+        elif key == '\x03':  # Ctrl + C
             print("\n\nExiting...")
             sys.exit(0)
 
@@ -124,7 +123,6 @@ class Api:
         sys.stdout = output_buffer
         
         try:
-            # Run the function
             func(*args)
         except Exception as e:
             print(f"An error occurred: {e}")
@@ -138,13 +136,11 @@ class Api:
             output = output_buffer.getvalue()
             output_buffer.close()
             
-            # Send each line to the log
             for line in output.splitlines():
                 self.log_message(line)
                 time.sleep(0.01)  # Prevents flooding
 
     def log_message(self, msg):
-        # Ensure we have a string
         if not isinstance(msg, str):
             msg = str(msg)
         print(msg)
@@ -160,8 +156,6 @@ class Api:
         self.log_message("DEBUG: Testing log output...")
         
         self.log_message("\n--- Running Installations ---")
-        kernelBootChanges_no_prompt1(self.distro)
-        sys.exit(0)
         try:
             self._log_and_run(installations, self.distro)
             self.log_message("DEBUG: Installations completed")
@@ -185,7 +179,7 @@ class Api:
         saveProgress(1, "complete")
 
     def start_choice_2(self):
-        self._run_in_thread(self._execute_choice_2)
+        self._execute_choice_2()
 
     def _execute_choice_2(self):
         saveProgress(2, 1)
@@ -202,23 +196,15 @@ class Api:
         
         self.log_message("\n--- Ensuring Libvirt Access ---")
         try:
-            ensure_libvirt_access()
+            ensure_libvirt_access("/var/lib/libvirt/images/")
             saveProgress(2, 3)
         except Exception as e:
             self.log_message(f"ERROR ensuring libvirt access: {e}")
             return
-        
-        self.log_message("\n--- Downloading VirtIO Drivers ---")
-        try:
-            virtioDrivers()
-            saveProgress(2, 4)
-        except Exception as e:
-            self.log_message(f"ERROR downloading virtio drivers: {e}")
-            return
-        
+
         self.log_message("\n--- Creating VM ---")
         try:
-            vm_name = create_vm()
+            vm_name = create_vm(self.distro)
             saveProgress(2, 5, {"vm_name": vm_name})
             self.log_message(f"VM created: {vm_name}")
         except Exception as e:
@@ -235,7 +221,7 @@ class Api:
         
         self.log_message("\n--- Updating Display to VNC ---")
         try:
-            update_display_to_vnc(vm_name)
+            update_display_to_vnc(vm_name, self.distro)
             saveProgress(2, 7)
         except Exception as e:
             self.log_message(f"ERROR updating display: {e}")
@@ -309,9 +295,8 @@ class Api:
         
         if choice == 2:
             self.log_message("Resuming VM creation from saved checkpoint...")
-            vm_name = data.get("vm_name", "win10")
+            vm_name = data.get("vm_name", "win11")
             
-            # Resume from the saved step
             if step < 5:
                 self.log_message("Restarting from the beginning of VM creation...")
                 self._execute_choice_2()
@@ -320,7 +305,6 @@ class Api:
                 self.log_message("\n--- Modifying Storage Bus ---")
                 modify_storage_bus(vm_name)
                 saveProgress(2, 6)
-                # Continue with remaining steps...
                 self._continue_choice_2_from_step_6(vm_name)
             else:
                 self.log_message(f"Resuming from step {step}...")
@@ -329,7 +313,7 @@ class Api:
     def _continue_choice_2_from_step_6(self, vm_name):
         """Continue choice 2 from step 6 onwards"""
         self.log_message("\n--- Updating Display to VNC ---")
-        update_display_to_vnc(vm_name)
+        update_display_to_vnc(vm_name, self.distro)
         saveProgress(2, 7)
         
         self.log_message("\n--- Cleaning Up Drives ---")
@@ -362,45 +346,100 @@ class Api:
         if step >= 6:
             self._continue_choice_2_from_step_6(vm_name)
 
+    def start_choice_4(self):
+        """Execute choice 4 - Custom Functions Menu (runs synchronously for interactive menu)"""
+        while True:
+            function_options = [
+                ("Function 1    -   Installations", "1"),
+                ("Function 2    -   Kernel Boot Changes", "2"),
+                ("Function 3    -   Create VM", "3"), #TODO
+                ("Function 4    -   Modifying Storage Bus", "4"),
+                ("Function 5    -   Updating Display to VNC", "5"),
+                ("Function 6    -   Cleaning Up Drives", "6"),
+                ("Function 7    -   Setting Up Libvirt Hooks", "7"),
+                ("Function 8    -   Updating start.sh Script", "8"),
+                ("Function 9    -   Updating revert.sh Script", "9"),
+                ("Function 10   -   Adding GPU Passthrough Devices", "10"),
+                ("Back to Main Menu", "back")
+            ]
+            
+            selection = show_menu(function_options, title="Custom Functions")
+            
+            # Clear screen for execution
+            print("\033[2J\033[H", end="", flush=True)
+            
+            if selection == "1":
+                installations(self.distro)
+                input("\nPress Enter to continue...")
+            elif selection == "2":
+                kernelBootChanges_no_prompt(self.distro)
+                input("\nPress Enter to continue...")
+            elif selection == "3":
+                vm_name = create_vm(self.distro)
+                input("\nPress Enter to continue...")
+            elif selection == "4":
+                #TODO
+                input("\nPress Enter to continue...")
+            elif selection == "5":
+                #TODO
+                input("\nPress Enter to continue...")
+            elif selection == "6":
+                #TODO
+                input("\nPress Enter to continue...")
+            elif selection == "7":
+                #TODO
+                input("\nPress Enter to continue...")
+            elif selection == "8":
+                #TODO
+                input("\nPress Enter to continue...")
+            elif selection == "9":
+                #TODO
+                input("\nPress Enter to continue...")
+            elif selection == "10":
+                #TODO
+                input("\nPress Enter to continue...")
+            elif selection == "back":
+                break
+
 def run_terminal_mode():
     """Run the application in terminal mode"""
     api = Api()
     
-    # Check for root privileges
+    # Requesting to be run as root
     if os.geteuid() != 0:
         print("Root privileges are required. Please run with sudo.")
         sys.exit(1)
     
     while True:
-        # Define menu options as (display_text, return_value) tuples
         menu_options = [
             ("Prepare Host System (Kernel Updates & Reboot)", "1"),
             ("Create VM & Passthrough GPU", "2"),
             ("Resume Previous Setup", "3"),
-            ("Exit", "4")
+            ("Custom Functions --- (Advanced)", "4"),
+            ("Exit", "5")
         ]
         
         choice = show_menu(menu_options)
-        
-        # Clear screen for execution
-        print("\033[2J\033[H", end="")
+
+        # Clearing screen
+        print("\033[2J\033[H", end="", flush=True)
         
         if choice == "1":
             api.start_choice_1()
-            # Wait for thread to complete
             time.sleep(1)
             input("\nPress Enter to continue...")
         elif choice == "2":
             api.start_choice_2()
-            # Wait for thread to complete
             time.sleep(1)
             input("\nPress Enter to continue...")
         elif choice == "3":
             api.start_choice_3()
-            # Wait for thread to complete
             time.sleep(1)
             input("\nPress Enter to continue...")
         elif choice == "4":
+            api.start_choice_4()
+            time.sleep(1)
+        elif choice == "5":
             print("Exiting...")
             break
 
