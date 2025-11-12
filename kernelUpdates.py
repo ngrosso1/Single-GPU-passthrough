@@ -90,7 +90,7 @@ def installations(distro):
         print(f"Installing packages for {distro.capitalize()}...")
         try:
             subprocess.run(commands[distro], shell=True, check=True)
-            print(f"Installation for {distro.capitalize()} completed.")
+            print(f"Installation for {distro.capitalize()} completed")
         except subprocess.CalledProcessError as e:
             print(f"🚨 Error 🚨 during installation: {RED}{e}{RESET}")
     else:
@@ -127,7 +127,7 @@ def installations(distro):
             print("  - dnsmasq")
             print("  - ebtables / iptables")
             print("\nAfter installing these packages, please rerun this script")
-            print("and select 'Resume Previous Setup' from the main menu.")
+            print("and select 'Resume Previous Setup' from the main menu")
             print("\nPress Enter to exit...")
             input()
             sys.exit(0)
@@ -135,10 +135,10 @@ def installations(distro):
             print(f"\nInstalling packages using {selected_pm.upper()}...")
             try:
                 subprocess.run(package_manager_commands[selected_pm], shell=True, check=True)
-                print(f"Installation using {selected_pm.upper()} completed.")
+                print(f"Installation using {selected_pm.upper()} completed")
             except subprocess.CalledProcessError as e:
                 print(f"🚨 Error 🚨 during installation: {RED}{e}{RESET}")
-                print("\nIf the installation failed, you may need to install manually.")
+                print("\nIf the installation failed, you may need to install manually")
                 print("Press Enter to continue...")
                 input()
 
@@ -171,13 +171,13 @@ def initramfsKernelBootChanges():
             for module in vfio_modules:
                 if module not in existing_lines:
                     f.write(f"{module}\n")
-        print("VFIO modules added to /etc/initramfs-tools/modules.")
+        print("VFIO modules added to /etc/initramfs-tools/modules")
     except Exception as e:
         print(f"Failed to modify {modules_path}: {RED}{e}{RESET}")
 
     print("Regenerating initramfs...")
     subprocess.run(["update-initramfs", "-u"])
-    print("Initramfs regeneration complete.")
+    print("Initramfs regeneration complete")
 
 def grubChanges():
     isAMD, isIntel = checkCPU()
@@ -199,7 +199,7 @@ def grubChanges():
         ]
         subprocess.run(command, check=True)
     else:
-        print("Unknown CPU vendor. Skipping kernel options.")
+        print("Unknown CPU vendor. Skipping kernel options")
     subprocess.run(["grub2-mkconfig", "-o", "/etc/grub2.cfg"])
 
 def popChanges():
@@ -211,7 +211,7 @@ def popChanges():
         print("Intel CPU detected. Setting kernel options...")
         subprocess.run(["kernelstub", "--add-options", "intel_iommu=on iommu=pt"])
     else:
-        print("Unknown CPU vendor. Skipping kernel options.")
+        print("Unknown CPU vendor. Skipping kernel options")
 
 def dracutKernelBootChanges():
     command = [
@@ -234,7 +234,7 @@ def sysChanges():
         iommu_option = "intel_iommu=on iommu=pt"
 
     if not iommu_option:
-        print("Unknown CPU vendor. Skipping kernel option modification.")
+        print("Unknown CPU vendor. Skipping kernel option modification")
         return
 
     # Get current kernel
@@ -279,9 +279,9 @@ def sysChanges():
     if modified:
         with open(matched_entry, "w") as f:
             f.writelines(new_lines)
-        print("IOMMU kernel options added successfully.")
+        print("IOMMU kernel options added successfully")
     else:
-        print("IOMMU options already present. No changes made.")
+        print("IOMMU options already present. No changes made")
 
 def show_bootloader_menu(options, title):
     """
@@ -343,7 +343,7 @@ def show_reboot_menu():
         print("\033[2J\033[H", end="")
         
         print(f"{BLUE}Bootloader and initramfs configuration complete!{RESET}")
-        print("\nA reboot is required for changes to take effect.")
+        print("\nA reboot is required for changes to take effect")
         print("\nUse ↑/↓ arrow keys to navigate, Enter to select:\n")
         
         # Print menu options
@@ -450,9 +450,9 @@ def kernelBootChanges_no_prompt(distro):
             dracutKernelBootChanges()
 
         if manualSet == True:
-            print("\nFor any manual configuration, restart your machine.")
+            print("\nFor any manual configuration, restart your machine")
             print("Afterwards, rerun this script and")
-            print("select 'Create VM & Passthrough GPU' from the main menu.")
+            print("select 'Create VM & Passthrough GPU' from the main menu")
             
             
         # Ask user if they want to reboot now or later
@@ -461,16 +461,16 @@ def kernelBootChanges_no_prompt(distro):
         if reboot_choice == "now":
             reboot_system()
         else:
-            print("\n\nPlease remember to reboot your system before proceeding to the next step.")
-            print("After rebooting, run this script again and select 'Create VM & Passthrough GPU'.")
+            print("\n\nPlease remember to reboot your system before proceeding to the next step")
+            print("After rebooting, run this script again and select 'Create VM & Passthrough GPU'")
             print("\nExiting...")
             sys.exit(0)
         
         print("\nBootloader and initramfs configuration complete!")
-        print("A reboot is required for changes to take effect.")
+        print("A reboot is required for changes to take effect")
 
 def reboot_system():
-    """Reboots the system."""
+    """Reboots the system"""
     print("Rebooting system now...")
     # Use a command that doesn't wait for the script to exit
     subprocess.Popen(["reboot"])

@@ -26,7 +26,7 @@ def restart_libvirt_service():
             print(f"Error restarting libvirtd with service: {e}")
     
     else:
-        print("Neither systemctl nor service command found. Please check your init system.")
+        print("Neither systemctl nor service command found. Please check your init system")
 
 def setup_libvirt_hooks(vm_name: str):
     try:
@@ -58,13 +58,13 @@ def setup_libvirt_hooks(vm_name: str):
         subprocess.run(["chmod", "+x", f"{prepare_dir}/start.sh"], check=True)
         subprocess.run(["chmod", "+x", f"{release_dir}/revert.sh"], check=True)
 
-        print("Libvirt hook setup completed successfully.")
+        print("Libvirt hook setup completed successfully")
 
     except subprocess.CalledProcessError as e:
         print(f"🚨 Error 🚨 occurred during setup: {RED}{e}{RESET}")
 
 def get_gpu_pci_ids():
-    """Returns the PCI IDs for the NVIDIA GPU (VGA and Audio)."""
+    """Returns the PCI IDs for the NVIDIA GPU (VGA and Audio)"""
     try:
         output = subprocess.check_output(["lspci", "-nnk"], text=True).splitlines()
 
@@ -80,7 +80,7 @@ def get_gpu_pci_ids():
         if vga_id and audio_id:
             print(f"Found GPU PCI IDs: VGA = {GREEN}{vga_id}{RESET}, Audio = {GREEN}{audio_id}{RESET}")
         else:
-            print("Could not find both GPU and Audio IDs.")
+            print("Could not find both GPU and Audio IDs")
         
         return vga_id, audio_id
 
@@ -122,12 +122,12 @@ def update_start_sh(vm_name: str):
         with open(start_sh_path, "w") as file:
             file.writelines(lines)
 
-        print(f"Updated {start_sh_path} with GPU detach commands.")
+        print(f"Updated {start_sh_path} with GPU detach commands")
 
     except FileNotFoundError:
-        print(f"{start_sh_path} not found.")
+        print(f"{start_sh_path} not found")
     except PermissionError:
-        print(f"Permission denied while editing {start_sh_path}.")
+        print(f"Permission denied while editing {start_sh_path}")
 
 def update_revert_sh(vm_name: str):
     """Prepends virsh nodedev-reattach lines to revert.sh after set -x"""
@@ -160,24 +160,24 @@ def update_revert_sh(vm_name: str):
         with open(revert_sh_path, "w") as file:
             file.writelines(lines)
 
-        print(f"Updated {revert_sh_path} with GPU reattach commands.")
+        print(f"Updated {revert_sh_path} with GPU reattach commands")
 
     except FileNotFoundError:
-        print(f"{revert_sh_path} not found.")
+        print(f"{revert_sh_path} not found")
     except PermissionError:
-        print(f"Permission denied while editing {revert_sh_path}.")
+        print(f"Permission denied while editing {revert_sh_path}")
 
 def add_gpu_passthrough_devices(vm_name):
-    """Attach GPU and audio PCI devices to a libvirt VM."""
+    """Attach GPU and audio PCI devices to a libvirt VM"""
     vga_id, audio_id = get_gpu_pci_ids()
 
     if not vga_id or not audio_id:
-        print("GPU or Audio PCI IDs not found. Exiting.")
+        print("GPU or Audio PCI IDs not found. Exiting...")
         return
 
     conn = libvirt.open("qemu:///system")
     if conn is None:
-        print("Failed to open libvirt connection.")
+        print("Failed to open libvirt connection")
         return
 
     try:

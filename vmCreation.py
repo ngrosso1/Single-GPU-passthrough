@@ -55,7 +55,7 @@ def get_sys_info():
         return None, None, None
     
 def get_vm_config():
-    """Prompt the user for VM configuration."""
+    """Prompt the user for VM configuration"""
     print("Please provide the following VM configuration:")
 
     cores, threads, sockets, total_memory, free_disk_space = get_sys_info()
@@ -73,7 +73,7 @@ def get_vm_config():
         print("====================================================")
         print(f"  - Total memory:                   {YELLOW}{total_memory}MB{RESET}")
     else:
-        print("Unable to retrieve CPU information. Please enter the values manually.")
+        print("Unable to retrieve CPU information. Please enter the values manually")
 
     #Name
     vmPrompt = f"Enter the name of the VM (Default {PURPLE}Windows_VM{RESET}): "
@@ -86,7 +86,7 @@ def get_vm_config():
             memory = int(memoryInput)
             
             if memory > total_memory:
-                print(f"🚨 Error 🚨 : Memory value cannot exceed total system memory ({YELLOW}{total_memory}MB{RESET}). Try again.")
+                print(f"🚨 Error 🚨 : Memory value cannot exceed total system memory ({YELLOW}{total_memory}MB{RESET}). Try again")
             else:
                 break
         except ValueError:
@@ -124,7 +124,7 @@ def get_vm_config():
     return vm_name, memory, tvcpus, diskSize, sockets, cores, threads
 
 def create_vm(distro):
-    """Use virt-install to create a VM using the provided Windows ISO."""
+    """Use virt-install to create a VM using the provided Windows ISO"""
 
     iso_file = get_windows_iso()
     vm_name, memory, vcpus, diskSize, sockets, cores, threads = get_vm_config()
@@ -162,14 +162,14 @@ def create_vm(distro):
         subprocess.run(command, check=True)
         subprocess.run(["virsh", "destroy", vm_name])
         virtioDrivers(vm_name)
-        print(f"VM '{vm_name}' created successfully.")
+        print(f"VM '{vm_name}' created successfully")
         print("======================================================================================")
-        print("Open up Virt-manager and open the running VM you just created and install windows.")
+        print("Open up Virt-manager and open the running VM you just created and install windows")
         print("After, shut down your VM and come back to this terminal session to proceed!")
-        print("\n⚠️  Note ⚠️ : Virt-manager sometimes fails to see the windows iso while booting up.")
-        print("Just rerunning the VM until it goes to the Windows install screen.")
+        print("\n⚠️  Note ⚠️ : Virt-manager sometimes fails to see the windows iso while booting up")
+        print("Just rerunning the VM until it goes to the Windows install screen")
         print("\nWhen you boot into Windows go to the VirtIO drivers. " \
-        "This is found in the CD drive that will be attached to the session.")
+        "This is found in the CD drive that will be attached to the session")
         print("The driver is called: virtio-win-gt-x64.msi")
         print("======================================================================================")
         while True:
@@ -231,9 +231,9 @@ def cleanupDrives(vm_name):
             print(f"Failed to detach {target_dev}: {RED}{e}{RESET}")
 
     if not disks_to_remove:
-        print("No additional drives found to detach.")
+        print("No additional drives found to detach")
     else:
-        print("All non-Windows drives have been detached.")
+        print("All non-Windows drives have been detached")
 
     conn.close()
 
@@ -278,9 +278,9 @@ def modify_storage_bus(vm_name):
 
         #Redefine the domain using the updated XML
         conn.defineXML(new_xml_desc)
-        print(f"Modified {vm_name} storage to use VirtIO.")
+        print(f"Modified {vm_name} storage to use VirtIO")
     else:
-        print(f"No changes needed for {vm_name}.")
+        print(f"No changes needed for {vm_name}")
 
     conn.close()
 
@@ -298,10 +298,10 @@ def get_local_ip():
         local_ip = '127.0.0.1'
     while True:
         print("===================================================================================")
-        print("VNC Server is set up on your VM and ssh is running on your system.")
+        print("VNC Server is set up on your VM and ssh is running on your system")
         print("We will soon attempt to disconnect the GPU from your host to the VM. The VM may")
         print("fail to show a display as it has no graphics drivers. Using VNC we can remote into")
-        print("the windows VM and install the needed graphics drivers. For now lets just test it.")
+        print("the windows VM and install the needed graphics drivers. For now lets just test it")
         print("On another device on the same network, remote into the VM via VNC!")
         print(f"Your local IP 🛜 is: {local_ip}")
         print("===================================================================================")
@@ -322,7 +322,7 @@ def update_display_to_vnc(vm_name, distro):
         while True:
             print("======================================================================================")
             print("There seems to be a bug with virt manager on Fedora. " \
-            "For this part you will need to do things manually.")
+            "For this part you will need to do things manually")
             print("To do this open up Virt-manager, " \
             "\n      ➡️  On the left side "
             "\n      ➡️  Open the tab show virtual hardware details"
@@ -359,7 +359,7 @@ def update_display_to_vnc(vm_name, distro):
     try:
         dom = conn.lookupByName(vm_name)
     except libvirt.libvirtError:
-        print(f"Domain {vm_name} not found.")
+        print(f"Domain {vm_name} not found")
         return
 
     xml = dom.XMLDesc()

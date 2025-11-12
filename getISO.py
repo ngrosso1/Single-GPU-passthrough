@@ -43,7 +43,7 @@ def virtioDrivers(vm_name):
 
             try:
                 urllib.request.urlretrieve(download_url, download_path)
-                print("Download complete.")
+                print("Download complete")
                 virtio_driver_file = download_path
             except Exception as e:
                 print(f"Download failed: {RED}{e}{RESET}")
@@ -69,7 +69,7 @@ def virtioDrivers(vm_name):
         "--type", "disk",
         "--persistent"
     ], check=True)
-    print("VirtIO storage device added.")
+    print("VirtIO storage device added")
 
     #Second VirtIO Driver ISO
     print("Please select the VirtIO driver ISO file... 📂")
@@ -115,7 +115,7 @@ def virtioDrivers(vm_name):
     while True:
         print("================================================================================")
         print("Install the VirtIO drivers in the Windows VM. This is found in the CD drive " \
-        "that will be attached to the session.")
+        "that will be attached to the session")
         print("The driver is called: virtio-win-gt-x64.msi")
         print("================================================================================")
         user_input = input("Did you install the VirtIO Driver on Windows (Y/n)?").strip().lower()
@@ -147,7 +147,7 @@ def get_windows_iso():
     )
 
     if not iso_file:
-        print("No file selected. Exiting.")
+        print("No file selected. Exiting")
         sys.exit(1)
         
     ensure_libvirt_access(iso_file)
@@ -155,7 +155,7 @@ def get_windows_iso():
     try:
         current_permissions = os.stat(iso_file).st_mode
         os.chmod(iso_file, current_permissions | stat.S_IROTH)
-        print(f"Permissions for {iso_file} updated to be world-readable.")
+        print(f"Permissions for {iso_file} updated to be world-readable")
     except Exception as e:
         print(f"Failed to change permissions on ISO: {RED}{e}{RESET}")
 

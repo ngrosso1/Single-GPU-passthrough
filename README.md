@@ -35,16 +35,19 @@ This script will help install, configure, and run a single GPU passthrough for a
 
 ## ⚠️ Troubleshooting:
 
-* If you are running Fedora there seems to be a bug with virt-manager. You will need to remove the display spice manually. The script should tell you when this should take place but keep this in mind
-* If you passed the GPU through the VM and the screen has been black for a long time then there may have been an issue. To troubleshoot this ssh into your PC and run the following below. 
+* Fedora users should know there seems to be a bug with virt-manager. You will need to remove the display spice manually. The script should tell you when this should take place but keep this in mind
+* In the event the GPU was passed through the VM and the screen has been black for a long period of time then there may have been an issue disconnecting nvidia modules. To troubleshoot this ssh into your PC and run the following below
     * lsmod | grep nvidia
+
+    * To get your IPv4 address
+        * ip -4 addr show $(ip route | awk '/default/ {print $5}') | grep -oP '(?<=inet\s)\d+(\.\d+){3}'
 
     There should be a nvidia driver or service in use as shown by the output. Add them to the hooks scripts below (replace {vm_name} with the name of your vm)
     * /etc/libvirt/hooks/qemu.d/{vm_name}/prepare/begin/start.sh
     * /etc/libvirt/hooks/qemu.d/{vm_name}/release/end/revert.sh
+* If you connected a USB device in virt manager and then remove it from your system, be sure to remove it in virt manager or else you wont be able to boot into your VM
 * If you are having issues trying to move your VM to an external drive:
     * Ensure you have said drive mounted
     * exFat (and any others that do not have file permissions) can cause issues with qemu
     * If the external drive has a different file system that you have the proper package installed on your system. For NTFS it usually is ntfs-3g, exFat (not recomended) is exfat-utils, etc.
-
 

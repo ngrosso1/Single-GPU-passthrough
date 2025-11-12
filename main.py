@@ -11,6 +11,7 @@ from kernelUpdates import installations, kernelBootChanges_no_prompt
 from vmCreation import get_sys_info, create_vm, modify_storage_bus, update_display_to_vnc, cleanupDrives
 from getISO import ensure_libvirt_access, virtioDrivers
 from hooks import setup_libvirt_hooks, update_start_sh, update_revert_sh, add_gpu_passthrough_devices
+from moving import main_moving
 
 PROGRESS_FILE = "progress.json"
 
@@ -32,7 +33,7 @@ def clearProgress():
         os.remove(PROGRESS_FILE)
 
 def get_distro():
-    """Get the current distribution from /etc/os-release."""
+    """Get the current distribution from /etc/os-release"""
     with open("/etc/os-release", "r") as f:
         for line in f:
             if line.lower().startswith("id="):
@@ -173,9 +174,9 @@ class Api:
             self.log_message(f"ERROR in kernelBootChanges_no_prompt: {e}")
             return
         
-        self.log_message("\nHost preparation complete. A reboot is required.")
-        self.log_message("You can reboot from your system menu, or run 'sudo reboot' in a terminal.")
-        self.log_message("After rebooting, please run this application again and choose option 2.")
+        self.log_message("\nHost preparation complete. A reboot is required")
+        self.log_message("You can reboot from your system menu, or run 'sudo reboot' in a terminal")
+        self.log_message("After rebooting, please run this application again and choose option 2")
         saveProgress(1, "complete")
 
     def start_choice_2(self):
@@ -268,7 +269,7 @@ class Api:
             return
         
         self.log_message("\n=== VM Setup Complete! ===")
-        self.log_message(f"Your VM '{vm_name}' is ready with GPU passthrough configured.")
+        self.log_message(f"Your VM '{vm_name}' is ready with GPU passthrough configured")
         clearProgress()
 
     def start_choice_3(self):
@@ -279,7 +280,7 @@ class Api:
         progress = loadProgress()
         
         if not progress:
-            self.log_message("No saved progress found. Please start from the beginning.")
+            self.log_message("No saved progress found. Please start from the beginning")
             return
         
         choice = progress.get("choice")
@@ -289,8 +290,8 @@ class Api:
         self.log_message(f"Found saved progress: Choice {choice}, Step {step}")
         
         if choice == 1:
-            self.log_message("Choice 1 (Host preparation) was in progress.")
-            self.log_message("Please restart Choice 1 from the beginning as kernel changes cannot be partially resumed.")
+            self.log_message("Choice 1 (Host preparation) was in progress")
+            self.log_message("Please restart Choice 1 from the beginning as kernel changes cannot be partially resumed")
             return
         
         if choice == 2:
@@ -337,7 +338,7 @@ class Api:
         saveProgress(2, 12)
         
         self.log_message("\n=== VM Setup Complete! ===")
-        self.log_message(f"Your VM '{vm_name}' is ready with GPU passthrough configured.")
+        self.log_message(f"Your VM '{vm_name}' is ready with GPU passthrough configured")
         clearProgress()
 
     def _continue_choice_2_from_step(self, vm_name, step):
@@ -400,6 +401,10 @@ class Api:
                 input("\nPress Enter to continue...")
             elif selection == "back":
                 break
+        
+    def start_choice_5(self):
+        """Execute choice 5 - Moving VMs (runs synchronously for interactive menu)"""
+        main_moving()
 
 def run_terminal_mode():
     """Run the application in terminal mode"""
@@ -407,7 +412,7 @@ def run_terminal_mode():
     
     # Requesting to be run as root
     if os.geteuid() != 0:
-        print("Root privileges are required. Please run with sudo.")
+        print("Root privileges are required. Please run with sudo")
         sys.exit(1)
     
     while True:
@@ -416,7 +421,8 @@ def run_terminal_mode():
             ("Create VM & Passthrough GPU", "2"),
             ("Resume Previous Setup", "3"),
             ("Custom Functions --- (Advanced)", "4"),
-            ("Exit", "5")
+            ("Moving VMs", "5"),
+            ("Exit", "6")
         ]
         
         choice = show_menu(menu_options)
@@ -440,6 +446,9 @@ def run_terminal_mode():
             api.start_choice_4()
             time.sleep(1)
         elif choice == "5":
+            api.start_choice_5()
+            time.sleep(1)
+        elif choice == "6":
             print("Exiting...")
             break
 
